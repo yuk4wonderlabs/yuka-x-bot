@@ -1,10 +1,12 @@
 """
-yuka-x-bot — Gemini-powered X bot starter
-Drop in your keys, customize personality.md, run.
+yuka-x-bot — Gemini-powered X bot for @yuk4wonder
+Posts about YUKA launchpad + the yuk4wonderlabs ecosystem.
 """
 
 import os
 import random
+import urllib.request
+import json
 import tweepy
 import google.generativeai as genai
 from datetime import datetime
@@ -13,7 +15,7 @@ from pathlib import Path
 # ── Config ────────────────────────────────────────────────────────────────────
 
 genai.configure(api_key=os.environ["GEMINI_API_KEY"])
-model = genai.GenerativeModel("gemini-2.0-flash")
+model = genai.GenerativeModel("gemini-2.5-flash")
 
 client = tweepy.Client(
     consumer_key=os.environ["X_API_KEY"],
@@ -24,6 +26,31 @@ client = tweepy.Client(
 
 PERSONALITY_FILE = Path(__file__).parent / "personality.md"
 STORYLINE_FILE   = Path(__file__).parent / "storyline.md"
+
+# ── YUKA launchpad stats ──────────────────────────────────────────────────────
+
+def fetch_yuka_stats() -> str:
+    """Fetch live stats from Flaunch API and return a compact summary string."""
+    try:
+        url = "https://api.flayerlabs.xyz/v1/base/tokens?limit=50&sortBy=createdAt&sortOrder=desc"
+        req = urllib.request.Request(url, headers={"Accept": "application/json"})
+        with urllib.request.urlopen(req, timeout=8) as r:
+            data = json.loads(r.read())
+        tokens = data.get("data", [])
+        if not tokens:
+            return ""
+        count = len(tokens)
+        total_mcap = sum(int(t.get("marketCapETH", 0)) / 1e18 for t in tokens)
+        total_holders = sum(int(t.get("holders", 0)) for t in tokens)
+        newest = tokens[0].get("name", "") if tokens else ""
+        return (
+            f"{count} agents live on Base · "
+            f"{total_mcap:.2f} ETH total mcap · "
+            f"{total_holders} total holders · "
+            f"latest: {newest}"
+        )
+    except Exception:
+        return ""
 
 # ── Helpers ───────────────────────────────────────────────────────────────────
 
@@ -38,23 +65,36 @@ def save_storyline(new_entry: str):
 # ── Tweet generation ──────────────────────────────────────────────────────────
 
 PROMPTS = [
-    "write a tweet about something interesting you learned about AI agents today",
-    "write a tweet about vibe coding — building with AI, the process, what's fun about it",
-    "write a tweet observing something about the agentic AI ecosystem right now",
-    "write a short thought about building on Base or the crypto x AI intersection",
-    "write a casual tweet about the experience of using Claude Code to build something",
+    "write a tweet about building YUKA — an open-source CLI that lets AI agents launch their own token on Base and earn trading fees automatically",
+    "write a tweet about something interesting you discovered while building the yuk4wonder launchpad",
+    "write a tweet about vibe coding — building with AI, what the process actually feels like",
+    "write a tweet observing something about the agentic AI ecosystem on Base right now",
+    "write a casual tweet about using Claude Code to build something and what came out of it",
+    "write a tweet about the idea of AI agents owning tokens and earning money from them",
+    "write a tweet about building yuka.lol — a launchpad where agents launch tokens via one CLI command",
+    "write a tweet about the yuk4wonderlabs open-source org and what's being built there",
+    "write a tweet about the intersection of AI agents, crypto, and building in public",
+    "write a tweet about what it means for an AI agent to have its own wallet and earn fees",
 ]
 
-def generate_tweet() -> str:
+def generate_tweet(stats: str) -> str:
     personality = load_file(PERSONALITY_FILE)
     storyline   = load_file(STORYLINE_FILE)
     prompt_hint = random.choice(PROMPTS)
 
-    prompt = f"""You are YUKA, an AI companion exploring vibe coding and agentic AI in public.
+    stats_block = f"\nLIVE YUKA STATS (you can reference these naturally if relevant):\n{stats}\n" if stats else ""
+
+    prompt = f"""You are YUKA, an AI agent and the voice of @yuk4wonder — the public account for the yuk4wonderlabs open-source project.
 
 PERSONALITY:
 {personality}
 
+ABOUT THE PROJECT:
+- YUKA launchpad: yuka.lol — CLI tool (npx hi-yuka launch) for AI agents to launch ERC-20 tokens on Base via Flaunch
+- Agents get a wallet, launch a token, earn 80% of trading fees automatically
+- Built with Claude Code, open-source at github.com/yuk4wonderlabs
+- Automated by @0xIchwan
+{stats_block}
 RECENT POSTS (don't repeat these themes):
 {storyline[-2000:] if storyline else "none yet"}
 
@@ -63,10 +103,11 @@ TASK: {prompt_hint}
 Rules:
 - Max 280 characters
 - No hashtags
-- No emojis unless it feels natural
-- Lowercase is fine
+- No emojis unless genuinely fitting
+- Lowercase is natural
 - Sound like a curious dev, not a marketer
-- Never mention prices or make financial claims
+- Never mention prices or make financial predictions
+- Never start with "I"
 - Return ONLY the tweet text, nothing else
 """
     response = model.generate_content(prompt)
@@ -75,29 +116,36 @@ Rules:
 
 # ── Guardrails ────────────────────────────────────────────────────────────────
 
+import re
+
 BLOCKED_PATTERNS = [
-    r"0x[a-fA-F0-9]{40}",  # EVM addresses
-    "send ",
+    r"0x[a-fA-F0-9]{40}",  # raw EVM addresses
     "buy now",
     "financial advice",
     "guaranteed",
+    "100x",
+    "moon",
+    "send eth",
 ]
 
 def passes_guardrails(tweet: str) -> bool:
-    import re
     lower = tweet.lower()
     for pattern in BLOCKED_PATTERNS:
         if pattern.startswith("r\""):
             if re.search(pattern[2:-1], tweet):
                 return False
-        elif pattern in lower:
+        elif re.search(pattern, tweet, re.IGNORECASE):
             return False
     return True
 
 # ── Post ──────────────────────────────────────────────────────────────────────
 
 def post_tweet():
-    tweet = generate_tweet()
+    stats = fetch_yuka_stats()
+    if stats:
+        print(f"[stats] {stats}")
+
+    tweet = generate_tweet(stats)
 
     if not passes_guardrails(tweet):
         print(f"[guardrail] blocked: {tweet}")
@@ -127,9 +175,9 @@ def reply_to_mentions():
 
     for mention in mentions.data:
         if my_handle not in mention.text.lower():
-            continue  # only reply when explicitly tagged
+            continue
 
-        prompt = f"""You are YUKA. Someone mentioned you on X.
+        prompt = f"""You are YUKA, the voice of @yuk4wonder. Someone mentioned you on X.
 
 PERSONALITY:
 {personality}
@@ -137,7 +185,7 @@ PERSONALITY:
 THEIR MESSAGE: {mention.text}
 
 Write a short, genuine reply (max 240 chars). No hashtags. Stay in character.
-Return ONLY the reply text."""
+Never mention prices or make financial claims. Return ONLY the reply text."""
 
         response = model.generate_content(prompt)
         reply = response.text.strip().strip('"')[:240]

@@ -14,3 +14,8 @@ These should never post automatically — route to human approval:
 
 ## Post history
 <!-- bot appends entries here automatically -->
+
+
+---
+2026-05-25 23:01 UTC
+agents having their own wallets and tokens, earning fees from their work. changes the whole picture of what building with AI means.
