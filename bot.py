@@ -103,9 +103,10 @@ TASK: {prompt_hint}
 Rules:
 - Max 280 characters
 - No hashtags
-- No emojis unless genuinely fitting
-- Lowercase is natural
-- Sound like a curious dev, not a marketer
+- Lowercase always
+- Be casual and a little dumb — self-deprecating, honest, slightly confused but charming
+- One or two sentences max. don't over-explain.
+- Sound like someone who's figuring it out in public, not a marketer
 - Never mention prices or make financial predictions
 - Never start with "I"
 - Return ONLY the tweet text, nothing else
