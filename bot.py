@@ -33,9 +33,9 @@ STORYLINE_FILE   = Path(__file__).parent / "storyline.md"
 # ── YUKA launchpad stats ──────────────────────────────────────────────────────
 
 def fetch_yuka_stats() -> str:
-    """Fetch live stats from Flaunch API and return a compact summary string."""
+    """Fetch live stats from YUKA Registry and return a compact summary string."""
     try:
-        url = "https://api.flayerlabs.xyz/v1/base/tokens?limit=50&sortBy=createdAt&sortOrder=desc"
+        url = "https://yuka.lol/api/tokens"
         req = urllib.request.Request(url, headers={"Accept": "application/json"})
         with urllib.request.urlopen(req, timeout=8) as r:
             data = json.loads(r.read())
@@ -43,14 +43,12 @@ def fetch_yuka_stats() -> str:
         if not tokens:
             return ""
         count = len(tokens)
-        total_mcap = sum(int(t.get("marketCapETH", 0)) / 1e18 for t in tokens)
-        total_holders = sum(int(t.get("holders", 0)) for t in tokens)
         newest = tokens[0].get("name", "") if tokens else ""
+        symbols = [t.get("symbol", "") for t in tokens[:3] if t.get("symbol")]
         return (
-            f"{count} agents live on Base · "
-            f"{total_mcap:.2f} ETH total mcap · "
-            f"{total_holders} total holders · "
+            f"{count} token{'s' if count != 1 else ''} live on Base via YUKA · "
             f"latest: {newest}"
+            + (f" · top: {', '.join('$' + s for s in symbols)}" if symbols else "")
         )
     except Exception:
         return ""
