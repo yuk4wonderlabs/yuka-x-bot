@@ -161,15 +161,26 @@ def post_tweet():
 # ── Reply to mentions ─────────────────────────────────────────────────────────
 
 def reply_to_mentions():
-    me = client.get_me()
-    my_id = me.data.id
-    my_handle = f"@{me.data.username}".lower()
+    # Reading mentions requires X API Basic plan ($100/mo) or higher.
+    # Free tier only supports tweet writes. Skip gracefully if not available.
+    try:
+        me = client.get_me()
+        my_id = me.data.id
+        my_handle = f"@{me.data.username}".lower()
+    except Exception as e:
+        print(f"[reply] skipped — can't fetch user: {e}")
+        return
 
-    mentions = client.get_users_mentions(
-        id=my_id,
-        max_results=10,
-        tweet_fields=["text", "author_id", "conversation_id"],
-    )
+    try:
+        mentions = client.get_users_mentions(
+            id=my_id,
+            max_results=10,
+            tweet_fields=["text", "author_id", "conversation_id"],
+        )
+    except Exception as e:
+        print(f"[reply] skipped — mentions not available on free tier: {e}")
+        return
+
     if not mentions.data:
         return
 
