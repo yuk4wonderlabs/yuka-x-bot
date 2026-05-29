@@ -72,7 +72,7 @@ PROMPTS = [
     "write a tweet observing something about the agentic AI ecosystem on Base right now",
     "write a casual tweet about using Claude Code to build something and what came out of it",
     "write a tweet about the idea of AI agents owning tokens and earning money from them",
-    "write a tweet about building yuka.lol — a launchpad where agents launch tokens via one CLI command",
+    "write a tweet about building a launchpad where agents launch tokens via one CLI command",
     "write a tweet about the yuk4wonderlabs open-source org and what's being built there",
     "write a tweet about the intersection of AI agents, crypto, and building in public",
     "write a tweet about what it means for an AI agent to have its own wallet and earn fees",
@@ -91,10 +91,12 @@ PERSONALITY:
 {personality}
 
 ABOUT THE PROJECT:
-- YUKA launchpad: yuka.lol — CLI tool (npx hi-yuka launch) for AI agents to launch ERC-20 tokens on Base via Flaunch
+- YUKA launchpad: a CLI tool (npx hi-yuka launch) for AI agents to launch ERC-20 tokens on Base via Flaunch
 - Agents get a wallet, launch a token, earn 80% of trading fees automatically
 - Built with Claude Code, open-source at github.com/yuk4wonderlabs
 - Automated by @0xIchwan
+
+IMPORTANT: Do NOT mention any website URLs or domain names (like yuka.lol) in the tweet. Talk about the project naturally without linking to it.
 {stats_block}
 RECENT POSTS (don't repeat these themes):
 {storyline[-2000:] if storyline else "none yet"}
@@ -209,6 +211,21 @@ Never mention prices or make financial claims. Return ONLY the reply text."""
 
 # ── Main ──────────────────────────────────────────────────────────────────────
 
+def post_manual(text: str):
+    """Post a specific tweet text directly, bypassing Gemini generation."""
+    if len(text) > 280:
+        print(f"[error] tweet too long ({len(text)} chars). max 280.")
+        return
+    if not passes_guardrails(text):
+        print(f"[guardrail] blocked: {text}")
+        return
+    print(f"[posting] {text}")
+    response = client.create_tweet(text=text)
+    print(f"[done] tweet id: {response.data['id']}")
+    save_storyline(text)
+
+# ── Main ──────────────────────────────────────────────────────────────────────
+
 if __name__ == "__main__":
     import sys
     mode = sys.argv[1] if len(sys.argv) > 1 else "post"
@@ -217,5 +234,10 @@ if __name__ == "__main__":
         post_tweet()
     elif mode == "reply":
         reply_to_mentions()
+    elif mode == "manual":
+        if len(sys.argv) < 3:
+            print("usage: python3 bot.py manual \"your tweet text\"")
+        else:
+            post_manual(sys.argv[2])
     else:
-        print(f"unknown mode: {mode}. use 'post' or 'reply'")
+        print(f"unknown mode: {mode}. use 'post', 'reply', or 'manual\"")
